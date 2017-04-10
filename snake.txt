@@ -1,0 +1,239 @@
+#include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+#include <conio.h>
+#include <cmath>
+#include <Windows.h>
+using namespace std;
+
+//光标定位
+HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+COORD coord;
+
+void locate(int x, int y)
+{
+	coord.X = y;
+	coord.Y = x;
+	SetConsoleCursorPosition(hout, coord);
+}
+
+//隐藏光标
+void hide()
+{
+	CONSOLE_CURSOR_INFO cursor_info = { 1, 0 };
+	SetConsoleCursorInfo(hout, &cursor_info);
+}
+
+//生成随机数
+double random(double start, double end)
+{
+	return start + (end - start) * rand() / (RAND_MAX + 1);
+}
+
+//定义地图长宽，蛇的位置，长度，方向， 食物的位置
+int m, n;
+
+struct node {
+	int x, y;
+}snake[1000];
+int snake_length, dir;
+node food;
+int direct[4][2] = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
+
+//输出墙
+void print_wall()
+{
+	cout << " ";
+	for (int i = 1; i <= n; i++) 
+		cout << "-";
+	cout << endl;
+	for (int j = 0; j < m; j++)
+	{
+		cout << "|";
+		for (int k = 1; k <= n; k++)
+			cout << " ";
+		cout << "|" << endl;
+	}
+	cout << " ";
+	for (int i = 1; i <= n; i++)
+		cout << "-";
+}
+
+//首次输出蛇，snake[0]代表蛇头
+void print_snake()
+{
+	locate(snake[0].x, snake[0].y);
+	cout << "@";
+	for (int i = 1; i <= snake_length - 1; i++)
+	{
+		locate(snake[i].x, snake[i].y);
+		cout << "*";
+	}
+	return;
+}
+
+//判断是否撞墙或自撞
+bool is_correct() {
+	if (snake[0].x == 0 || snake[0].x == m + 1 || snake[0].y == 0 || snake[0].y == n + 1) return false;
+	for (int i = 1; i < snake_length; i++)
+	{
+		if (snake[0].x == snake[i].x && snake[0].y == snake[i].y)
+			return false;
+	}
+	return true;
+}
+
+//随机生成并输出食物位置
+bool print_food()
+{
+	srand((unsigned)time(0));
+	bool e;
+	while (1)
+	{
+		e = true;
+		int i = random(0, m) + 1; int j = random(0, n) + 1;
+		food.x = i; food.y = j;
+		for (int k = 0; k < snake_length; k++)
+		{
+			if (food.x == snake[k].x && food.y == snake[k].y)
+			{
+				e = false;
+				break;
+			}
+		}
+		if (e) break;
+	}
+	locate(food.x, food.y);
+	cout << "$";
+	return true;
+}
+
+//蛇的前进
+bool go_ahead()
+{
+	node temp;
+	bool e = false;
+	temp = snake[snake_length - 1];
+	for (int i = snake_length - 1; i >= 1; i--)
+		snake[i] = snake[i - 1];
+	snake[0].x += direct[dir][0];
+	snake[0].y += direct[dir][1];
+	locate(snake[1].x, snake[1].y);
+	cout << "*";
+	if (snake[0].x == food.x && snake[0].y == food.y)
+	{
+		e = true;
+		snake_length++;
+		snake[snake_length - 1] = temp;
+	}
+	if (!e)
+	{
+		locate(temp.x, temp.y);
+		cout << " ";
+	}
+	else
+	{
+		print_food();
+	}
+	locate(snake[0].x, snake[0].y);
+	cout << "@";
+	if (!is_correct())
+	{
+		system("cls");
+		cout << "Fuck You Idiot!!!!!" << endl << "Length: " << snake_length;
+		return false;
+	}
+	return true;
+}
+
+//主函数
+int main()
+{
+	cout << "--------------------贪吃蛇---------------------" << endl;
+	cout << "请先输入两个数,表示地图大小.要求长宽均不小于10." << endl;
+	cout << "请注意窗口大小,以免发生错位.建议将窗口调为最大." << endl;
+	cout << "再选择难度.请在1-10中输入1个数,1最简单,10则最难" << endl;
+	cout << "然后进入游戏画面,以方向键控制方向.祝你游戏愉快!" << endl;
+	cout << "这游戏非常简单你过不了说明你是个智障哈哈哈哈哈" << endl;
+	cout << "-----------------------------------------------" << endl;
+	cin >> m >> n; 
+	if (m < 10 || m > 25 || n < 10 || n> 40)
+	{
+		cout << "ERROR" << endl;
+		system("pause");
+		return 0;
+	}
+	int hard;
+	cin >> hard;
+	if (hard <= 0 && hard >= 100)
+	{
+		cout << "ERROR" << endl;
+		system("pause");
+		return 0;
+	}
+	//数据初始化
+	snake_length = 5;
+	clock_t a, b;
+	char ch;
+	double hard_len;
+	for (int i = 0; i < 5; i++)
+	{
+		snake[i].x = 1;
+		snake[i].y = 5 - i;
+	}
+	dir = 3;
+	//输出地图，蛇和食物
+	system("cls");
+	print_wall();
+	print_snake();
+	print_food();
+	locate(m + 2, 0);
+	cout << "Now Length: ";
+	//start game
+	while (1)
+	{
+		//the longer the length the harder the game
+		hard_len = (double)snake_length / (double)(m*n);
+		a = clock();
+		while (1)
+		{
+			b = clock();
+			if ((b - a) >= (int)(400 - 30 * hard)*(1 - sqrt(hard_len)))
+				break;
+		}
+		if (kbhit())
+		{
+			ch = getch();
+			if (ch == -32)
+			{
+				ch = getch();
+				switch (ch)
+				{
+				case 72:
+					if (dir == 2 || dir == 3)
+						dir = 0;
+					break;
+				case 80:
+					if (dir == 2 || dir == 3)
+						dir = 1;
+					break;
+				case 75:
+					if (dir == 0 || dir == 1)
+						dir = 2;
+					break;
+				case 77:
+					if (dir == 0 || dir == 1)
+						dir = 3;
+					break;
+				}
+			}
+		}
+		//前进
+		if (!go_ahead()) break;
+		locate(m + 2, 12);
+		cout << snake_length;
+	}
+	system("pause");
+	return 0;
+}
