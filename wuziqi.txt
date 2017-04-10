@@ -1,0 +1,392 @@
+#include <iostream>
+#include <windows.h>
+#include <cstring>
+#include <cstdlib>
+using namespace std;
+
+
+/*光标定位*/
+HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE), hin = GetStdHandle(STD_INPUT_HANDLE);
+COORD coord, pos;
+
+void locate(int x, int y)
+{
+	coord.X = y;
+	coord.Y = x;
+	SetConsoleCursorPosition(hout, coord);
+}
+
+/*隐藏光标*/
+void hide()
+{
+	CONSOLE_CURSOR_INFO cursor_info = { 1, 0 };
+	SetConsoleCursorInfo(hout, &cursor_info);
+}
+
+INPUT_RECORD mouseRec;
+DWORD res;
+
+struct win_list
+{
+	bool is_able;
+	int x[5], y[5];
+	bool is_used[5];
+};
+
+int len, sum;
+int chess[20][20], scoreC[20][20], scoreP[20][20];
+int last_x, last_y;
+
+win_list computer[2000], person[2000];
+
+/*数据初始化，将所有可能情况录入*/
+void init()
+{
+	int i, j, k;
+	sum = 0;
+	memset(chess, 0, sizeof(chess));
+	for (i = 0; i <= len - 1; i++)
+	{
+		for (j = 0; j <= len - 5; j++)
+		{
+			computer[sum + (len - 4) * i + j].is_able = true;
+			for (k = 0; k <= 4; k++)
+			{
+				computer[sum + (len - 4) * i + j].is_used[k] = false;
+				computer[sum + (len - 4) * i + j].x[k] = i;
+				computer[sum + (len - 4) * i + j].y[k] = j + k;
+			}
+		}
+	}
+	sum += (len - 4) * len;
+	for (i = 0; i <= len - 5; i++)
+	{
+		for (j = 0; j <= len - 1; j++)
+		{
+			computer[sum + len * i + j].is_able = true;
+			for (k = 0; k <= 4; k++)
+			{
+				computer[sum + len * i + j].is_used[k] = false;
+				computer[sum + len * i + j].x[k] = i + k;
+				computer[sum + len * i + j].y[k] = j;
+			}
+		}
+	}
+	sum += (len - 4) * len;
+	for (i = 0; i <= len - 5; i++)
+	{
+		for (j = 0; j <= len - 5; j++)
+		{
+			computer[sum + (len - 4) * i + j].is_able = true;
+			for (k = 0; k <= 4; k++)
+			{
+				computer[sum + (len - 4) * i + j].is_used[k] = false;
+				computer[sum + (len - 4) * i + j].x[k] = i + k;
+				computer[sum + (len - 4) * i + j].y[k] = j + k;
+			}
+		}
+	}
+	sum += (len - 4) * (len - 4);
+	for (i = 4; i <= len - 1; i++)
+	{
+		for (j = 0; j <= len - 5; j++)
+		{
+			computer[sum + (len - 4) * (i - 4) + j].is_able = true;
+			for (k = 0; k <= 4; k++)
+			{
+				computer[sum + (len - 4) * (i - 4) + j].is_used[k] = false;
+				computer[sum + (len - 4) * (i - 4) + j].x[k] = i - k;
+				computer[sum + (len - 4) * (i - 4) + j].y[k] = j + k;
+			}
+		}
+	}
+	sum += (len - 4) * (len - 4);
+	for (i = 0; i <= sum - 1; i++)
+		person[i] = computer[i];
+}
+
+/*落子函数， 其中w=1代表机器落子， w=2代表人落子*/
+void put_down(int x0, int y0, int w)
+{
+	chess[x0][y0] = w;
+	locate(x0 + 2, y0 + 2);
+	if (w == 2) cout << "o";
+	else
+	{
+		cout << "+";
+		if (last_x != -1)
+		{
+			locate(last_x + 2, last_y + 2);
+			cout << "*";
+		}
+		last_x = x0; last_y = y0;
+	}
+	locate(len + 3, 0);
+	int i, j;
+	for (i = 0; i <= sum - 1; i++)
+	{
+		for (j = 0; j <= 4; j++)
+		{
+			if (w == 1)
+			{
+				if (computer[i].x[j] == x0 && computer[i].y[j] == y0)
+					computer[i].is_used[j] = true;
+				if (person[i].x[j] == x0 && person[i].y[j] == y0)
+					person[i].is_able = false;
+			}
+			else
+			{
+				if (computer[i].x[j] == x0 && computer[i].y[j] == y0)
+					computer[i].is_able = false;
+				if (person[i].x[j] == x0 && person[i].y[j] == y0)
+					person[i].is_used[j] = true;
+			}
+		}
+	}
+}
+
+
+/*评分函数，w=1代表给机器评分， w=2代表给人评分*/
+int judge(int x0, int y0, int w)
+{
+	int i, j, k;
+	int score = 1;
+	memset(scoreC, 0, sizeof(scoreC));
+	memset(scoreP, 0, sizeof(scoreP));
+	if (w == 1)
+	{
+		for (i = 0; i <= sum - 1; i++)
+		{
+			score = 1;
+			if (computer[i].is_able == false) continue;
+			for (j = 0; j <= 4; j++)
+			{
+				if (computer[i].x[j] == x0 && computer[i].y[j] == y0)
+				{
+					k = j - 1;
+					while (k >= 0 && computer[i].is_used[k] == true)
+					{
+						k--;
+						score *= 6;
+					}
+					k = j + 1;
+					while (k <= 4 && computer[i].is_used[k] == true)
+					{
+						k++;
+						score *= 6;
+					}
+					break;
+				}
+			}
+			scoreC[x0][y0] += score;
+		}
+	}
+	else
+	{
+		for (i = 0; i <= sum - 1; i++)
+		{
+			score = 1;
+			if (person[i].is_able == false) continue;
+			for (j = 0; j <= 4; j++)
+			{
+				if (person[i].x[j] == x0 && person[i].y[j] == y0)
+				{
+					k = j - 1;
+					while (k >= 0 && person[i].is_used[k] == true) {
+						k--;
+						score *= 6;
+					}
+					k = j + 1;
+					while (k <= 4 && person[i].is_used[k] == true)
+					{
+						k++;
+						score *= 6;
+					}
+					break;
+				}
+			}
+			scoreP[x0][y0] += score;
+		}
+	}
+	if (w == 1) return scoreC[x0][y0];
+	return scoreP[x0][y0];
+}
+
+/*寻找落子位置*/
+int where()
+{
+	int i, j;
+	int tempCx, tempCy, tempPx, tempPy;
+	int scoreC = 0, scoreP = 0;
+	int a, b;
+	for (i = 0; i <= len - 1; i++)
+	{
+		for (j = 0; j <= len - 1; j++)
+		{
+			if (chess[i][j] == 0)
+			{
+				a = judge(i, j, 1);
+				if (scoreC < a)
+				{
+					scoreC = a; tempCx = i; tempCy = j;
+				}
+				b = judge(i, j, 2);
+				if (scoreP < b)
+				{
+					scoreP = b; tempPx = i; tempPy = j;
+				}
+			}
+		}
+	}
+	if (scoreC < scoreP)
+		return tempPx * len + tempPy;
+	return tempCx * len + tempCy;
+}
+
+/*判断游戏是否结束*/
+bool is_ended(int x0, int y0, int w) {
+	int score = 1;
+	int i, j, k;
+	if (w == 1)
+	{
+		for (i = 0; i < sum; i++)
+		{
+			score = 1;
+			if (computer[i].is_able == false) continue;
+			for (j = 0; j <= 4; j++)
+			{
+				if (computer[i].x[j] == x0 && computer[i].y[j] == y0)
+				{
+					k = j - 1;
+					while (k >= 0 && computer[i].is_used[k] == true)
+					{
+						k--;
+						score++;
+					}
+					k = j + 1;
+					while (k <= 4 && computer[i].is_used[k] == true)
+					{
+						k++;
+						score++;
+					}
+					if (score == 5) return false;
+					break;
+				}
+			}
+		}
+	}
+	else
+	{
+		for (i = 0; i < sum; i++)
+		{
+			score = 1;
+			if (person[i].is_able == false) continue;
+			for (j = 0; j <= 4; j++)
+			{
+				if (person[i].x[j] == x0 && person[i].y[j] == y0)
+				{
+					k = j - 1;
+					while (k >= 0 && person[i].is_used[k] == true)
+					{
+						k--;
+						score++;
+					}
+					k = j + 1;
+					while (k <= 4 && person[i].is_used[k] == true)
+					{
+						k++;
+						score++;
+					}
+					if (score == 5) return false;
+					break;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+/*输出棋盘*/
+void print()
+{
+	locate(0, 0);
+	int i, j;
+	for (i = 1; i <= 4; i++) cout << "                          " << endl;
+	locate(0, 0);
+	cout << " ";
+	for (i = 1; i <= len; i++) cout << i % 10;
+	cout << endl << " ";
+	for (i = 1; i <= len; i++) cout << "-";
+	cout << endl;
+	for (i = 1; i <= len; i++)
+	{
+		cout << i % 10 << "|";
+		for (j = 1; j <= len; j++) cout << " ";
+		cout << "|" << endl;
+	}
+	cout << " ";
+	for (i = 0; i <= len - 1; i++) cout << "-";
+	cout << endl;
+}
+
+/*主函数*/
+int main()
+{
+	cout << "--------五子棋游戏--------" << endl;
+	cout << "请输入地图的宽度，不小于10" << endl;
+	cout << "请直接用鼠标点击屏幕上的点" << endl;
+	cout << "--------------------------" << endl;
+	cin >> len;
+	if (len < 10)
+	{
+		cout << "ERROR" << endl;
+		system("pause");
+		return 0;
+	}
+	int x0, y0, z0;
+	int input = 0, e = 0;
+	last_x = last_y = -1;
+	init();
+	print();
+	hide();
+	while (1)
+	{
+		while (1)
+		{
+			ReadConsoleInput(hin, &mouseRec, 1, &res);
+			if (mouseRec.EventType == MOUSE_EVENT)
+			{
+				pos = mouseRec.Event.MouseEvent.dwMousePosition;
+				x0 = pos.Y - 2; y0 = pos.X - 2;
+				if (mouseRec.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
+				{
+					if ((x0 >= 0 && x0 <= len - 1 && y0 >= 0 && y0 <= len - 1 && chess[x0][y0] == 0)) break;
+				}
+			}
+		}
+		locate(len + 3, 0);
+		cout << "            ";
+		put_down(x0, y0, 2);
+		if (!is_ended(x0, y0, 2))
+		{
+			e = 2; break;
+		}
+		input++;
+		if (input > len * len) break;
+		z0 = where();
+		x0 = z0 / len; y0 = z0 % len;
+		put_down(x0, y0, 1);
+		if (!is_ended(x0, y0, 1))
+		{
+			e = 1; break;
+		}
+		input++;
+		if (input > len * len) break;
+	}
+	locate(len + 3, 0);
+	if (e == 0) cout << "Draw!" << endl;
+	if (e == 1) cout << "You Lose!" << endl;
+	if (e == 2) cout << "You win!" << endl;
+	system("pasue");
+	return 0;
+}
